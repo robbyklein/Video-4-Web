@@ -22,6 +22,10 @@ class FileStatus: ObservableObject, Identifiable {
         formatSize(newSize)
     }
 
+    var isCompleted: Bool {
+        return status == "Completed" || status == "Failed" || status == "Cancelled"
+    }
+
     var savingsFormatted: String {
         if originalSize > 0 {
             let percentage = Double(savings) / Double(originalSize) * 100

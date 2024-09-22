@@ -2,6 +2,8 @@ import SwiftUI
 
 @main
 struct Video4WebApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     @StateObject private var windowManager = WindowManager()
     @StateObject private var settingsManager = SettingsManager()
     @StateObject private var viewModel = ContentViewModel()
@@ -13,6 +15,14 @@ struct Video4WebApp: App {
                 .environmentObject(settingsManager)
                 .environmentObject(viewModel)
                 .frame(minWidth: 560, minHeight: 360)
+                .onAppear {
+                    viewModel.requestNotificationPermission()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+                    for operation in viewModel.operations.values {
+                        operation.terminateAllFFmpegTasks()
+                    }
+                }
         }
         .windowResizability(.contentMinSize)
         .commands {
