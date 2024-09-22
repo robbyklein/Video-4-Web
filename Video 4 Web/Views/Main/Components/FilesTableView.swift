@@ -29,6 +29,11 @@ struct FilesListView: View {
                 SavingsCell(fileStatus: fileStatus)
             }
             .width(80)
+
+            TableColumn("") { fileStatus in
+                ActionCell(fileStatus: fileStatus)
+            }
+            .width(30)
         }
         .tableStyle(.inset(alternatesRowBackgrounds: true))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -36,13 +41,11 @@ struct FilesListView: View {
     }
 }
 
-// Custom cell views
 struct StatusCell: View {
     @ObservedObject var fileStatus: FileStatus
 
     var body: some View {
         ZStack {
-            // Set a fixed height for the cell
             Rectangle()
                 .foregroundColor(.clear)
                 .frame(height: 20)
@@ -111,5 +114,24 @@ struct SavingsCell: View {
     var body: some View {
         Text(fileStatus.savingsFormatted)
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct ActionCell: View {
+    @ObservedObject var fileStatus: FileStatus
+    @EnvironmentObject var viewModel: ContentViewModel
+
+    var body: some View {
+        if fileStatus.status == "Processing" || fileStatus.status == "Queued" {
+            Button(action: {
+                viewModel.cancelOperation(for: fileStatus)
+            }, label: {
+                Image(systemName: "stop.circle.fill")
+                    .foregroundColor(.secondary)
+            })
+            .buttonStyle(BorderlessButtonStyle())
+        } else {
+            EmptyView()
+        }
     }
 }

@@ -1,11 +1,14 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import AppKit
+import UserNotifications
 
 class ContentViewModel: ObservableObject {
     @Published var fileStatuses: [FileStatus] = []
 
-    private let ffmpegQueue: OperationQueue = {
+    var operations: [UUID: VideoProcessingOperation] = [:]
+
+    let ffmpegQueue: OperationQueue = {
         let queue = OperationQueue()
         queue.maxConcurrentOperationCount = max(ProcessInfo.processInfo.processorCount / 2, 1)
         queue.name = "FFmpegOperationQueue"
@@ -56,6 +59,7 @@ class ContentViewModel: ObservableObject {
                         viewModel: self
                     )
 
+                    self.operations[fileStatus.id] = operation
                     self.ffmpegQueue.addOperation(operation)
                 } else {
                     DispatchQueue.main.async {
@@ -98,9 +102,6 @@ class ContentViewModel: ObservableObject {
         }
     }
 
-    /// Helper method to get file size.
-    /// - Parameter url: URL of the file.
-    /// - Returns: Size of the file in bytes.
     func getFileSize(at url: URL) -> Int64 {
         do {
             let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
@@ -111,5 +112,61 @@ class ContentViewModel: ObservableObject {
             print("Error getting file size for \(url): \(error)")
         }
         return 0
+    }
+
+    func cancelOperation(for fileStatus: FileStatus) {
+        if let operation = operations[fileStatus.id] {
+            operation.cancel()
+            DispatchQueue.main.async {
+                fileStatus.status = "Cancelled"
+            }
+            operations.removeValue(forKey: fileStatus.id)
+        }
+    }
+
+    func requestNotificationPermission() {
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+            if let error = error {
+                print("Notification permission error: \(error)")
+            } else if granted {
+                print("Notification permission granted.")
+            } else {
+                print("Notification permission denied.")
+            }
+        }
+    }
+
+    func checkForCompletion() {
+        DispatchQueue.main.async {
+            if self.operations.isEmpty && self.fileStatuses.allSatisfy({ $0.isCompleted }) {
+                print("All operations completed. Sending notification.")
+                self.sendCompletionNotification()
+            } else {
+                print("Operations still in progress or statuses not completed.")
+            }
+        }
+    }
+
+    private func sendCompletionNotification() {
+        print("Preparing to send completion notification.")
+        let content = UNMutableNotificationContent()
+        content.title = "Processing Queue Completed"
+        content.body = "All operations completed."
+        content.sound = UNNotificationSound.default
+
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil // Deliver immediately
+        )
+
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Error scheduling notification: \(error)")
+            } else {
+                print("Notification scheduled successfully.")
+            }
+        }
     }
 }
